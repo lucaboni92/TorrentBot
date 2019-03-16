@@ -1,0 +1,7 @@
+{
+	"allowed_telegram_chat_id": "",
+	"telegram_bot_key": "",
+	"transmission_credentials": "",
+	"sudo_password": "",
+	"log_file":  "/home/torrentBot.log"
+}
