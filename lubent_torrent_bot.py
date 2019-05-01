@@ -49,6 +49,7 @@ def risp(msg):
 	if sender['id'] != int(lubent_chatID):
 		logging.warning('Unauthorized user tryed to access to TorrentBot. TelegramID=%s - %s %s (%s)', sender_username, sender_firstname, sender_lastname, sender_id)
 		bot.sendMessage(chat_id, "You are not allowed to use this bot")
+		bot.sendMessage(int(lubent_chatID), "Unauthorized user tryed to access to TorrentBot. TelegramID=%s - %s %s (%s)", sender_username, sender_firstname, sender_lastname, sender_id)
 		Termination()
 
 	if cmd == '/start':
@@ -81,6 +82,14 @@ def risp(msg):
 		AlternativeSpeedON(msg)
 	elif cmd == '/tortoiseOFF':
 		AlternativeSpeedOFF(msg)
+	elif cmd == '/tortoiseOFF':
+		AlternativeSpeedOFF(msg)
+	elif cmd == '/nightmodeToggle':
+		NightModeON_OFF(msg)
+	elif cmd == '/nightmodeRead':
+		NightModeReadStatus(msg)
+	elif cmd.startswith('/add magnet:'):
+		AddTorrentFile(msg)
 	else:
 		UnknownCommand(msg)
 
@@ -112,10 +121,13 @@ def PrintHelp(msg):
 	/chat_id Telegram chatID\n
 	/torrents torrent list
 	/statistics of the torrent service\n
+	/nightmodeRead nightmode status
+	/nightmodeToggle nightmode ON/OFF
 	/tortoiseON alternative speed ON
-	/tortoiseOFF alternative speed OFF
+	/tortoiseOFF alternative speed OFF\n
 	/torrentStart torrent service
 	/torrentStop torrent service\n
+	/add <magnetURL>\n
 	/reboot torrent server
 	/shutdown torrent server""")
 	bot.sendMessage(chat_id, h)
@@ -284,6 +296,47 @@ def AlternativeSpeedOFF(msg):
 	os.system("transmission-remote -n "+transmissionCredentials+" --no-alt-speed")
 	bot.sendMessage(chat_id, "Disabing alternative speed...")
 	logging.info('%s(%s) disabled Transmission alternative speed', sender['username'], sender['id'])
+	
+def NightModeReadStatus(msg):
+	chat_id = msg['chat']['id']
+	sender = msg['from']
+	bot.sendMessage(chat_id, "NightMode is currently " + nightmode)
+
+def NightModeON_OFF(msg):
+	chat_id = msg['chat']['id']
+	sender = msg['from']
+	global nightmode
+	if nightmode == "OFF":
+		nightmode = "ON"
+		os.system("transmission-remote -n "+transmissionCredentials+" --alt-speed-time-begin 0800")
+		os.system("transmission-remote -n "+transmissionCredentials+" --alt-speed-time-end 2345")
+		os.system("transmission-remote -n "+transmissionCredentials+" --alt-speed-scheduler")
+		bot.sendMessage(chat_id, "NightMode turned ON")
+		bot.sendMessage(chat_id, "Alternative speed from 08:00 to 23:45\nFull speed from 23:45 to 08:00")
+		logging.info('%s(%s) NightMode turned ON', sender['username'], sender['id'])
+	elif nightmode == "ON":
+		nightmode = "OFF"
+		os.system("transmission-remote -n "+transmissionCredentials+" --no-alt-speed-scheduler")
+		os.system("transmission-remote -n "+transmissionCredentials+" --no-alt-speed")
+		bot.sendMessage(chat_id, "NightMode turned OFF")
+		bot.sendMessage(chat_id, "Torrents download will proceed at full speed h24")
+		logging.info('%s(%s) NightMode turned OFF', sender['username'], sender['id'])
+	else:
+		bot.sendMessage(chat_id, "Error on NightMode value")
+		logging.info('%s(%s) Error on NightMode value: (%s)', sender['username'], sender['id'], nightmode)
+
+def AddTorrentFile(msg):
+	chat_id = msg['chat']['id']
+	sender = msg['from']
+	text = msg['text']
+	magnetURL = text[5:]
+	cmdoutput = cmdline("transmission-remote -n "+transmissionCredentials+" --add " + magnetURL)
+	if (cmdoutput.find('responded: "success"') > -1):
+		bot.sendMessage(chat_id, "Torrent file successfully added to download list")
+		logging.info('%s(%s) Torrent file added to download list: (%s)', sender['username'], sender['id'], magnetURL)
+	else:
+		bot.sendMessage(chat_id, "Error in the magnet URL. Torrent file not added to download list")
+		logging.info('%s(%s) Tryed to add torrent file to download list without success: (%s)', sender['username'], sender['id'], magnetURL)
 
 def Termination():
 	quit()
@@ -298,7 +351,7 @@ def main():
 		bot.message_loop(risp)
 
 		while 1:
-			time.sleep(10)
+			time.sleep(30)
 
 	except KeyboardInterrupt:
 		### to intercept CTRL+C interrupt
